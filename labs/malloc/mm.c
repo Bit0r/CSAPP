@@ -36,8 +36,16 @@ team_t team = {
     "",
 };
 
-// #define SIZE_MASK ~(ALIGNMENT - 1)
-// #define ALLOCATE_BIT 0x1
+/* single word (4) or double word (8) alignment */
+static const size_t alignment = 8;
+
+/* rounds up to the nearest multiple of ALIGNMENT */
+inline static size_t round_up(size_t size, size_t round_to) {
+    return (size + round_to - 1) & -round_to;
+}
+
+static const size_t size_t_size = sizeof(size_t);
+static size_t increment_min;
 
 typedef struct block block;
 struct block {
@@ -54,10 +62,6 @@ static void *place(block *bp, size_t size);
 static void insert_after(block *pre, block *bp);
 static void extend_heap(block *tail, size_t size);
 static bool coalesce(block *bp);
-static size_t round_up(size_t size, size_t round_to);
-
-static const size_t alignment = 8, size_t_size = sizeof(size_t);
-static size_t increment_min;
 
 /*
  * mm_init - initialize the malloc package.
@@ -71,9 +75,7 @@ int mm_init(void) {
     // 初始化空闲链表的“哑头”
     bp->size = alignment / 2;
     bp->next = (block *)bp[1].payload;
-    // 初始化“头部的哑已分配块”
-    bp[1].size = alignment / 2;
-    // 初始化真正的空闲链表，且留下一个“尾哑块”
+    // 初始化真正的空闲链表，且留下“哑头块”和“尾哑块”
     bp = (block *)bp[1].payload;
     bp->size = mem_heapsize() - 2 * alignment;
     bp->next = NULL;
@@ -210,8 +212,4 @@ static bool coalesce(block *bp) {
     } else {
         return false;
     }
-}
-
-static size_t round_up(size_t size, size_t round_to) {
-    return (size + round_to - 1) & -round_to;
 }
